@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paper Search</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: auto; }
+        input, button { margin: 5px; padding: 8px; }
+        #results { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h2>Search Papers</h2>
+    <label>Keywords (comma-separated): </label>
+    <input type="text" id="keywords"><br><br>
+    <label>Years (comma-separated): </label>
+    <input type="text" id="years"><br><br>
+    <button onclick="searchPapers()">Search</button>
+
+    <h3>Results</h3>
+    <div id="results"></div>
+    <div>
+        <button id="prevPage" onclick="changePage(-1)" disabled>Previous</button>
+        <button id="nextPage" onclick="changePage(1)" disabled>Next</button>
+    </div>
+
+    <script>
+        const RAW_JSONL_URL = "https://raw.githubusercontent.com/manhtdd/conf-crawler/refs/heads/main/outputs/papers.jsonl";
+        
+        let papers = [];
+        let filteredPapers = [];
+        let page = 1;
+        const perPage = 5;
+
+        async function loadPapers() {
+            try {
+                const response = await fetch(RAW_JSONL_URL);
+                const text = await response.text();
+                
+                // Convert JSONL to JSON array
+                papers = text.trim().split("\n").map(line => JSON.parse(line));
+                console.log("Papers Loaded:", papers.length);
+            } catch (error) {
+                console.error("Error loading papers:", error);
+            }
+        }
+
+        async function searchPapers() {
+            await loadPapers();
+
+            const keywords = document.getElementById("keywords").value.toLowerCase().split(",").map(k => k.trim());
+            const years = document.getElementById("years").value.split(",").map(y => y.trim());
+
+            filteredPapers = papers.filter(paper => {
+                const text = paper.paper.toLowerCase();
+                const matchKeywords = keywords.some(k => k && text.includes(k));
+                const matchYears = years.some(y => y && (paper.conference?.includes(y) || paper.volume?.includes(y)));
+
+                return matchKeywords && matchYears;
+            });
+
+            page = 1;
+            showResults();
+        }
+
+        function showResults() {
+            const resultsDiv = document.getElementById("results");
+            resultsDiv.innerHTML = "";
+
+            const start = (page - 1) * perPage;
+            const end = start + perPage;
+            const paginatedResults = filteredPapers.slice(start, end);
+
+            if (paginatedResults.length === 0) {
+                resultsDiv.innerHTML = "<p>No papers found.</p>";
+                return;
+            }
+
+            resultsDiv.innerHTML = paginatedResults.map(paper =>
+                `<p><strong>${paper.title}</strong><br>${paper.paper} (${paper.conference || paper.volume})</p>`
+            ).join("");
+
+            document.getElementById("prevPage").disabled = page === 1;
+            document.getElementById("nextPage").disabled = end >= filteredPapers.length;
+        }
+
+        function changePage(step) {
+            page += step;
+            showResults();
+        }
+    </script>
+</body>
+</html>
